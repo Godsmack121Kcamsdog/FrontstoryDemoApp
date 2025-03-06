@@ -18,28 +18,34 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-object AdManager {
-    private const val TAG = "AdManager"
+class AdManager : AdProvider {
+
+    companion object {
+        private const val TAG = "AdManager"
+        private const val NATIVE_AD_ID = "ca-app-pub-3940256099942544/2247696110" // Test ID
+        private const val INTERSTITIAL_AD_ID = "ca-app-pub-3940256099942544/1033173712" // Test ID
+    }
+
     private val job = Job()
     private val scope = CoroutineScope(job + Dispatchers.IO)
 
-    private var _interstitialAdFlow = MutableStateFlow<InterstitialAd?>(null)
-    private var interstitialAdFlow = _interstitialAdFlow.asStateFlow()
+    private val _interstitialAdFlow = MutableStateFlow<InterstitialAd?>(null)
+    private val interstitialAdFlow = _interstitialAdFlow.asStateFlow()
 
-    private var _actionsFlow = MutableStateFlow<AdAction>(AdAction.Idle)
-    val actionsFlow = _actionsFlow.asStateFlow()
+    private val _actionsFlow = MutableStateFlow<AdAction>(AdAction.Idle)
+    private val actionsFlow = _actionsFlow.asStateFlow()
 
-    private var _nativeAdsFlow = MutableStateFlow<List<SdkNativeAd>>(emptyList())
-    var nativeAdsFlow = _nativeAdsFlow.asStateFlow()
+    private val _nativeAdsFlow = MutableStateFlow<List<SdkNativeAd>>(emptyList())
+    private val nativeAdsFlow = _nativeAdsFlow.asStateFlow()
 
-    private const val INTERSTITIAL_AD_ID = "ca-app-pub-3940256099942544/1033173712" // Test ID
-    private const val NATIVE_AD_ID = "ca-app-pub-3940256099942544/2247696110" // Test ID
+    private var nativeAdsId: String = ""
 
-    fun initialize(context: Context) {
+    override fun initialize(context: Context) {
         MobileAds.initialize(context) {
             scope.launch {
                 _actionsFlow.emit(AdAction.Action(null, "AdMob was initialized"))
@@ -47,8 +53,9 @@ object AdManager {
         }
     }
 
-    fun loadNativeAds(context: Context, adsId: String = NATIVE_AD_ID) {
-        val adLoader = AdLoader.Builder(context, adsId)
+    override fun loadNativeAds(context: Context, adsId: String?) {
+        nativeAdsId = adsId ?: NATIVE_AD_ID
+        val adLoader = AdLoader.Builder(context, nativeAdsId)
             .forNativeAd { ad: NativeAd ->
                 // Show the ad.
                 scope.launch {
@@ -76,9 +83,9 @@ object AdManager {
         adLoader.loadAds(AdRequest.Builder().build(), 3)
     }
 
-    fun loadInterstitialAd(context: Context, adsId: String = INTERSTITIAL_AD_ID) {
+    override fun loadInterstitialAd(context: Context, adsId: String?) {
         val adRequest = AdRequest.Builder().build()
-        InterstitialAd.load(context, adsId, adRequest,
+        InterstitialAd.load(context, adsId ?: INTERSTITIAL_AD_ID, adRequest,
             object : InterstitialAdLoadCallback() {
                 override fun onAdLoaded(ad: InterstitialAd) {
                     scope.launch {
@@ -106,7 +113,7 @@ object AdManager {
             })
     }
 
-    fun showInterstitialAd(activity: Activity) {
+    override fun showInterstitialAd(activity: Activity) {
         scope.launch {
             interstitialAdFlow.collect { ad ->
                 withContext(Dispatchers.Main) {
@@ -117,7 +124,15 @@ object AdManager {
         }
     }
 
-    fun clear(activity: Activity, nativeAdsId: String = NATIVE_AD_ID) {
+    override fun getActionsFlow(): StateFlow<AdAction> {
+        return actionsFlow
+    }
+
+    override fun getNativeAdsFlow(): StateFlow<List<SdkNativeAd>> {
+        return nativeAdsFlow
+    }
+
+    override fun clear(activity: Activity) {
         AdLoader.Builder(activity, nativeAdsId)
             .forNativeAd { nativeAd ->
                 // If this callback occurs after the activity is destroyed, you

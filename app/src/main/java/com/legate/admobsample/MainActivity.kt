@@ -2,6 +2,7 @@ package com.legate.admobsample
 
 import android.app.Activity
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -28,20 +29,23 @@ import com.legate.admobsample.ui.theme.AdMobSampleTheme
 import com.legate.sdk.SdkNativeAd
 import com.legate.sdk.manager.AdAction
 import com.legate.sdk.manager.AdManager
+import com.legate.sdk.manager.AdProvider
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
+    private val adManager: AdProvider = AdManager()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        AdManager.initialize(this)
+        adManager.initialize(this)
 
         setContent {
             AdMobSampleTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MainScreen(innerPadding)
+                    MainScreen(innerPadding, adManager)
                 }
             }
         }
@@ -50,7 +54,7 @@ class MainActivity : ComponentActivity() {
             DataStorage.incrementAppOpenCount(this@MainActivity) //increment every app opening time
 
             //tracking AdManager actions
-            AdManager.actionsFlow.collect {
+            adManager.getActionsFlow().collect {
                 when (it) {
                     is AdAction.Action -> {
                         Toast.makeText(
@@ -76,32 +80,33 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        AdManager.clear(this)
+        adManager.clear(this)
     }
 }
 
 @Composable
-fun MainScreen(padding: PaddingValues) {
+fun MainScreen(padding: PaddingValues, adManager: AdProvider) {
     val interstitialAdLimit = 2
     val context = LocalContext.current
-    val nativeAds by AdManager.nativeAdsFlow.collectAsState()
+    val nativeAds by adManager.getNativeAdsFlow().collectAsState()
 
     // Uploading interstitial ads
     LaunchedEffect(key1 = "LOAD_INTERSTITIAL_AD") {
-        AdManager.loadInterstitialAd(context)
+        adManager.loadInterstitialAd(context, null)
     }
 
     // show InterstitialAd after second app loading
     LaunchedEffect(key1 = "SHOW_INTERSTITIAL_AD") {
         val openCount = DataStorage.getAppOpenCount(context).first()
+        Log.e("RRRRR", "MainScreen: $openCount")
         if (openCount >= interstitialAdLimit) {
-            AdManager.showInterstitialAd(context as Activity)
+            adManager.showInterstitialAd(context as Activity)
         }
     }
 
     // Uploading native ads
     LaunchedEffect(key1 = "LOAD_NATIVE_ADS") {
-        AdManager.loadNativeAds(context)
+        adManager.loadNativeAds(context, null)
     }
 
     val items = mutableListOf<Any>("Item 1", "Item 2", "Item 3", "Item 4", "Item 5", "Item 6")
