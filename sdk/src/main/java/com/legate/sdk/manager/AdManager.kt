@@ -17,8 +17,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -37,8 +40,8 @@ class AdManager : AdProvider {
     private val _interstitialAdFlow = MutableStateFlow<InterstitialAd?>(null)
     private val interstitialAdFlow = _interstitialAdFlow.asStateFlow()
 
-    private val _actionsFlow = MutableStateFlow<AdAction>(AdAction.Idle)
-    private val actionsFlow = _actionsFlow.asStateFlow()
+    private val _actionsFlow = MutableSharedFlow<AdAction>()
+    private val actionsFlow = _actionsFlow.asSharedFlow()
 
     private val _nativeAdsFlow = MutableStateFlow<List<SdkNativeAd>>(emptyList())
     private val nativeAdsFlow = _nativeAdsFlow.asStateFlow()
@@ -124,7 +127,7 @@ class AdManager : AdProvider {
         }
     }
 
-    override fun getActionsFlow(): StateFlow<AdAction> {
+    override fun getActionsFlow(): SharedFlow<AdAction> {
         return actionsFlow
     }
 
